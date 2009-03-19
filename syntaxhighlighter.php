@@ -3,331 +3,382 @@
 **************************************************************************
 
 Plugin Name:  SyntaxHighlighter
-Plugin URI:   http://wordpress.org/extend/plugins/syntaxhighlighter/
-Version:      1.1.2
-Description:  An advanced upload-and-activate WordPress implementation of Alex Gorbatchev's <a href="http://code.google.com/p/syntaxhighlighter/">SyntaxHighlighter</a> JavaScript code highlighting package. See WordPress.com's "<a href="http://faq.wordpress.com/2007/09/03/how-do-i-post-source-code/">How do I post source code?</a>" for details.
-Author:       <a href="http://photomatt.net/">Matt</a>, <a href="http://www.viper007bond.com/">Viper007Bond</a>, and <a href="http://blogwaffe.com/">mdawaffe</a>
+Plugin URI:   http://www.viper007bond.com/wordpress-plugins/syntaxhighlighter/
+Version:      2.0.0 Alpha
+Description:  Easily post code to your blog while still maintaining complete control over it's display. Uses Alex Gorbatchev's <a href="http://code.google.com/p/syntaxhighlighter/">SyntaxHighlighter</a> and code by <a href="http://automattic.com/">Automattic</a>.
+Author:       Viper007Bond
+Author URI:   http://www.viper007bond.com/
 
 **************************************************************************
 
-Credits:
+Thanks to:
 
-* Matt ( ma.tt ) -- original concept and code on WP.com
-* Viper007Bond ( viper007bond.com ) -- current plugin version
+* Alex Gorbatchev for writing such an awesome Javascript-powered synatax
+  highlighter script
 
-Simply put, Matt deserves the majority of the credit for this plugin.
-I (Viper007Bond) just took the plugin I had already written (it looked a
-lot like this current one) after seeing his code operate on WP.com and
-incorporated his ingenius TinyMCE handling and some other misc. code.
+* Automattic who I "stole" the TinyMCE plugin from (although I modified it
+  a bit) and the inspiration for this plugin
 
 **************************************************************************/
 
-class AGSyntaxHighlighter {
-	var $languages = array();
-	var $languagesregex;
-	var $jsfiles2load = array();
-	var $pluginurl;
-	var $kses_active = array();
-	var $kses_filters = array();
-	var $widget_format_to_edit = false;
+class SyntaxHighlighter {
+	// All of these variables are private. Filters are provided for things that can be modified.
+	var $agshver     = '2.0.296'; // Alex Gorbatchev's SyntaxHighlighter version
+	var $brushes     = array();   // Array of aliases => brushes
+	var $themes      = array();   // Array of themes
+	var $usedbrushes = array();   // Stores used brushes so we know what to output
 
-	// WordPress hooks
-	function AGSyntaxHighlighter() {
-		add_action( 'init', array(&$this, 'SetVariables'), 1000 );
-		add_action( 'wp_head', array(&$this, 'AddStylesheet'), 1000 );
-		add_action( 'admin_head', array(&$this, 'AddStylesheet'), 1000 );
-		add_action( 'wp_footer', array(&$this, 'FileLoader'), 1000 );
-		add_action( 'admin_footer', array(&$this, 'FileLoader'), 1000 ); // For viewing comments in admin area
+	// Initalize the plugin by registering our hooks
+	function __construct() {
+		// Check WordPress version
+		if ( !function_exists( 'plugins_url' ) ) return;
 
-		// Find and replace the BBCode
-		add_filter( 'the_content', array(&$this, 'BBCodeToHTML'), 8 );
-		add_filter( 'widget_text', array(&$this, 'BBCodeToHTML'), 8 );
+		// Register brush scripts
+		wp_register_script( 'syntaxhighlighter-core',             plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shCore.js'),            array(),                         $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-bash',       plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushBash.js'),       array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-csharp',     plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushCSharp.js'),     array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-cpp',        plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushCpp.js'),        array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-css',        plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushCss.js'),        array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-delphi',     plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushDelphi.js'),     array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-diff',       plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushDiff.js'),       array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-groovy',     plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushGroovy.js'),     array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-jscript',    plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushJScript.js'),    array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-java',       plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushJava.js'),       array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-perl',       plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushPerl.js'),       array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-php',        plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushPhp.js'),        array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-plain',      plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushPlain.js'),      array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-python',     plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushPython.js'),     array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-ruby',       plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushRuby.js'),       array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-scala',      plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushScala.js'),      array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-sql',        plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushSql.js'),        array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-vb',         plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushVb.js'),         array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_script( 'syntaxhighlighter-brush-xml',        plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushXml.js'),        array('syntaxhighlighter-core'), $this->agshver );
 
-		// Account for kses
-		add_filter( 'content_save_pre', array(&$this, 'before_kses_normalization'), 1 );
-		add_filter( 'content_save_pre', array(&$this, 'after_kses_normalization'), 11 );
-		add_action( 'admin_head', array(&$this, 'before_kses_normalization_widget'), 1 );
-		add_action( 'update_option_widget_text', array(&$this, 'after_kses_normalization_widget'), 1, 2 );
-		add_filter( 'format_to_edit', array(&$this, 'after_kses_normalization_widget_format_to_edit'), 1 );
+		// Register theme stylesheets and enqueue the core stylesheet
+		// Stylesheets need to be in the <head>, so we're forced to always load it there
+		wp_enqueue_style(   'syntaxhighlighter-core',             plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shCore.css'),            array(),                         $this->agshver );
+		wp_register_style(  'syntaxhighlighter-theme-default',    plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeDefault.css'),    array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_style(  'syntaxhighlighter-theme-django',     plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeDjango.css'),     array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_style(  'syntaxhighlighter-theme-emacs',      plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeEmacs.css'),      array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_style(  'syntaxhighlighter-theme-fadetogrey', plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeFadeToGrey.css'), array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_style(  'syntaxhighlighter-theme-midnight',   plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeMidnight.css'),   array('syntaxhighlighter-core'), $this->agshver );
+		wp_register_style(  'syntaxhighlighter-theme-rdark',      plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeRDark.css'),      array('syntaxhighlighter-core'), $this->agshver );
 
-		// Account for TinyMCE
-		add_filter( 'content_save_pre', array(&$this, 'TinyMCEDecode'), 8 );
-		add_filter( 'the_editor_content', array(&$this, 'TinyMCEEncode'), 8 );
+		// Register hooks
+		add_filter( 'the_content',          array(&$this, 'parse_shortcodes'),          9 );
+		add_action( 'wp_footer',            array(&$this, 'maybe_output_scripts'),      15 );
+		add_filter( 'content_save_pre',     array(&$this, 'encode_shortcode_contents'), 1 );
+		add_filter( 'the_editor_content',   array(&$this, 'decode_shortcode_contents'), 1 );
+		add_filter( 'mce_external_plugins', array(&$this, 'add_tinymce_plugin') );
 
-		// Uncomment these next lines to allow commenters to post code
-		//add_filter( 'comment_text', array(&$this, 'BBCodeToHTML'), 8 );
-		//add_filter( 'pre_comment_content', array(&$this, 'before_kses_normalization_comment'), 1 );
-		//add_filter( 'pre_comment_content', array(&$this, 'after_kses_normalization_comment'), 11 );
-	}
+		// Create list of brush aliases and map them to their real brushes
+		$this->brushes = array(
+			'bash'       => 'bash',
+			'shell'      => 'bash',
+			'c-sharp'    => 'csharp',
+			'csharp'     => 'csharp',
+			'cpp'        => 'cpp',
+			'c'          => 'cpp',
+			'css'        => 'css',
+			'delphi'     => 'delphi',
+			'pas'        => 'delphi',
+			'pascal'     => 'delphi',
+			'diff'       => 'diff',
+			'patch'      => 'diff',
+			'groovy'     => 'groovy',
+			'js'         => 'jscript',
+			'jscript'    => 'jscript',
+			'javascript' => 'jscript',
+			'java'       => 'java',
+			'perl'       => 'perl',
+			'pl'         => 'perl',
+			'php'        => 'php',
+			'plain'      => 'plain',
+			'text'       => 'plain',
+			'py'         => 'python',
+			'python'     => 'python',
+			'rails'      => 'ruby',
+			'ror'        => 'ruby',
+			'ruby'       => 'ruby',
+			'scala'      => 'scala',
+			'sql'        => 'sql',
+			'vb'         => 'vb',
+			'vbnet'      => 'vb',
+			'xml'        => 'xml',
+			'xhtml'      => 'xml',
+			'xslt'       => 'xml',
+			'html'       => 'xml',
+			'xhtml'      => 'xml',
+		);
 
-
-	// Set some variables now that we've given all other plugins a chance to load
-	function SetVariables() {
-		$this->pluginurl = apply_filters( 'agsyntaxhighlighter_url', get_bloginfo( 'wpurl' ) . '/wp-content/plugins/syntaxhighlighter/files/' );
-		if ( defined( 'WP_CONTENT_URL' ) )
-			$this->pluginurl = apply_filters( 'agsyntaxhighlighter_url', WP_CONTENT_URL . '/plugins/syntaxhighlighter/files/' );
-		// Define all allowed languages and allow plugins to modify this
-		$this->languages = apply_filters( 'agsyntaxhighlighter_languages', array(
-			'cpp'        => 'shBrushCpp.js',
-			'c'          => 'shBrushCpp.js',
-			'c++'        => 'shBrushCpp.js',
-			'c#'         => 'shBrushCSharp.js',
-			'c-sharp'    => 'shBrushCSharp.js',
-			'csharp'     => 'shBrushCSharp.js',
-			'css'        => 'shBrushCss.js',
-			'delphi'     => 'shBrushDelphi.js',
-			'pascal'     => 'shBrushDelphi.js',
-			'java'       => 'shBrushJava.js',
-			'js'         => 'shBrushJScript.js',
-			'jscript'    => 'shBrushJScript.js',
-			'javascript' => 'shBrushJScript.js',
-			'php'        => 'shBrushPhp.js',
-			'py'         => 'shBrushPython.js',
-			'python'     => 'shBrushPython.js',
-			'rb'         => 'shBrushRuby.js',
-			'ruby'       => 'shBrushRuby.js',
-			'rails'      => 'shBrushRuby.js',
-			'ror'        => 'shBrushRuby.js',
-			'sql'        => 'shBrushSql.js',
-			'vb'         => 'shBrushVb.js',
-			'vb.net'     => 'shBrushVb.js',
-			'xml'        => 'shBrushXml.js',
-			'html'       => 'shBrushXml.js',
-			'xhtml'      => 'shBrushXml.js',
-			'xslt'       => 'shBrushXml.js',
+		// Create list of themes and their human readable names
+		// Plugins can add to this list as long as they also register a style with the handle "syntaxhighlighter-theme-THEMENAMEHERE"
+		$this->themes = apply_filters( 'syntaxhighlighter_themes', array(
+			'default'    => __( 'Default',      'syntaxhighlighter' ),
+			'django'     => __( 'Django',       'syntaxhighlighter' ),
+			'emacs'      => __( 'Emacs',        'syntaxhighlighter' ),
+			'fadetogrey' => __( 'Fade to Grey', 'syntaxhighlighter' ),
+			'midnight'   => __( 'Midnight',     'syntaxhighlighter' ),
+			'rdark'      => __( 'RDark',        'syntaxhighlighter' ),
 		) );
 
-		// Quote them to make them regex safe
-		$languages = array();
-		foreach ( $this->languages as $language => $filename ) $languages[] = preg_quote( $language );
 
-		// Generate the regex for them
-		$this->languagesregex = '(' . implode( '|', $languages ) . ')';
 
-		$this->kses_filters = apply_filters( 'agsyntaxhighlighter_kses_filters', array(
-			'wp_filter_kses',
-			'wp_filter_post_kses',
-			'wp_filter_nohtml_kses'
-		) );
+
+
+		// Temporary until user options implemented
+		wp_enqueue_style( 'syntaxhighlighter-theme-default' );
 	}
 
 
-	// We need to stick the stylesheet in the header for best results
-	function AddStylesheet() {
-		echo '	<link type="text/css" rel="stylesheet" href="' . $this->pluginurl . 'SyntaxHighlighter.css"></link>' . "\n";
+	// Add the custom TinyMCE plugin which wraps plugin shortcodes in <pre> in TinyMCE
+	// This plugin is based on one from WordPress.com
+	function add_tinymce_plugin( $plugins ) {
+		$plugins['syntaxhighlighter'] = plugins_url('/syntaxhighlighter/syntaxhighlighter_mce.js');
+		return $plugins;
 	}
 
 
-	// This function checks for the BBCode cheaply so we don't waste CPU cycles on regex if it's not needed
-	// It's in a seperate function since it's used in mulitple places (makes it easier to edit)
-	function CheckForBBCode( $content ) {
-		if ( stristr( $content, '[sourcecode' ) && stristr( $content, '[/sourcecode]' ) ) return TRUE;
-		if ( stristr( $content, '[source' ) && stristr( $content, '[/source]' ) ) return TRUE;
-		if ( stristr( $content, '[code' ) && stristr( $content, '[/code]' ) ) return TRUE;
-
-		return FALSE;
+	// Helper function for registering all plugin shortcodes
+	function register_shortcodes( $callback ) {
+		add_shortcode( 'sourcecode', $callback );
+		add_shortcode( 'source', $callback );
+		add_shortcode( 'code', $callback );
+		foreach ( $this->brushes as $shortcode => $brush )
+			add_shortcode( $shortcode, $callback );
 	}
 
 
-	// This function is a wrapper for preg_match_all() that grabs all BBCode calls
-	// It's in a seperate function since it's used in mulitple places (makes it easier to edit)
-	function GetBBCode( $content, $addslashes = FALSE ) {
-		$regex = '/\[(sourcecod|sourc|cod)(e language=|e lang=|e=)';
-		if ( $addslashes ) $regex .= '\\\\';
-		$regex .= '([\'"])' . $this->languagesregex;
-		if ( $addslashes ) $regex .= '\\\\';
-		$regex .= '\3\](.*?)\[\/\1e\]/si';
+	// Helper function for doing the shortcode hack
+//	function 
 
-		preg_match_all( $regex, $content, $matches, PREG_SET_ORDER );
 
-		return $matches;
+	// HTML entity encode the contents of shortcodes
+	function encode_shortcode_contents( $content ) {
+		global $shortcode_tags;
+
+		// The content comes raw from the $_POST and as such is slash escaped
+		$content = stripslashes( $content );
+
+		// Backup current registered shortcodes and clear them all out
+		$orig_shortcode_tags = $shortcode_tags;
+		remove_all_shortcodes();
+
+		// Register our shortcodes
+		$this->register_shortcodes( array(&$this, 'encode_shortcode_contents_callback') );
+
+		// Parse just our shortcodes (that's all that's registered at the moment)
+		$content = do_shortcode( $content );
+
+		// Put the original shortcodes back
+		$shortcode_tags = $orig_shortcode_tags;
+
+		// The content came in slashed so it needs to go out slashed
+		return addslashes( $content );
 	}
 
 
-	/* If KSES is going to hit this text, we double encode stuff within the [sourcecode] tags to keep 
-	 * 	wp_kses_normalize_entities from breaking them.
-	 * $content = text to parse
-	 * $which_filter = which filter to check to see if kses will be applied
-	 * $addslashes = used by AGSyntaxHighlighter::GetBBCode
-	 */
-	function before_kses_normalization( $content, $which_filter = 'content_save_pre', $addslashes = true ) {
-		global $wp_filter;
-		if ( is_string($which_filter) && !isset($this->kses_active[$which_filter]) ) {
-			$this->kses_active[$which_filter] = false;
-			$filters = $wp_filter[$which_filter];
-			foreach ( (array) $filters as $priority => $filter ) {
-				foreach ( $filter as $k => $v ) {
-					if ( in_array( $filter[$k]['function'], $this->kses_filters ) ) {
-						$this->kses_active[$which_filter] = true;
-						break 2;
-					}
-				}
-			}
-		}
-
-		if ( ( true === $which_filter || $this->kses_active[$which_filter] ) && $this->CheckForBBCode( $content ) ) {
-			$matches = $this->GetBBCode( $content, $addslashes );
-			foreach( (array) $matches as $match )
-				$content = str_replace( $match[5], htmlspecialchars( $match[5], ENT_QUOTES ), $content );
-		}
-		return $content;
-	}
-
-
-	/* We undouble encode the stuff within [sourcecode] tags to fix the output of
-	 * 	AGSyntaxHighlighter::before_kses_normalization.
-	 */
-	function after_kses_normalization( $content, $which_filter = 'content_save_pre', $addslashes = true ) {
-		if ( ( true === $which_filter || $this->kses_active[$which_filter] ) && $this->CheckForBBCode( $content ) ) {
-			$matches = $this->GetBBCode( $content, $addslashes );
-			foreach( (array) $matches as $match )
-				$content = str_replace( $match[5], htmlspecialchars_decode( $match[5], ENT_QUOTES ), $content );
-		}
-		return $content;
-	}
-
-
-	// Wrapper for comment text
-	function before_kses_normalization_comment( $content ) {
-		return $this->before_kses_normalization( $content, 'pre_comment_content' );
-	}
-
-
-	function after_kses_normalization_comment( $content ) {
-		return $this->after_kses_normalization( $content, 'pre_comment_content' );
-	}
-
-
-	/* "Wrapper" for widget text.  Since we lack the necessary filters, we directly alter the
-	 * 	submitted $_POST variables before the widgets are updated.
-	 */
-	function before_kses_normalization_widget() {
-		global $pagenow;
-		if ( 'widgets.php' != $pagenow || current_user_can( 'unfiltered_html' ) )
-			return;
-
-		$i = 1;
-		while ( isset($_POST["text-submit-$i"]) ) {
-			$_POST["text-text-$i"] = $this->before_kses_normalization( $_POST["text-text-$i"], true );
-			$i++;
-		}
-	}
-
-	// Again, since we lack the needed filters, we have to check the freshly updated option and re-update it.
-	function after_kses_normalization_widget( $old, $new ) {
-		static $do_update = true;
-
-		if ( !$do_update || current_user_can( 'unfiltered_html' ) )
-			return;
-
-		foreach ( array_keys($new) as $i => $widget )
-			$new[$i]['text'] = $this->after_kses_normalization( $new[$i]['text'], true, false );
-
-		$do_update = false;
-
-		update_option( 'widget_text', $new );
-		$this->widget_format_to_edit = true;
-
-		$do_update = true;
-	}
-
-	// Totally lame.  The output of the widget form in the admin screen is cached from before our re-update.
-	function after_kses_normalization_widget_format_to_edit( $content ) {
-		if ( !$this->widget_format_to_edit )
+	// HTML entity decode the contents of shortcodes, but only if TinyMCE is to be displayed first
+	function decode_shortcode_contents( $content ) {
+		if ( 'html' != wp_default_editor() )
 			return $content;
 
-		$content = $this->after_kses_normalization( $content, true, false );
+		global $shortcode_tags;
 
-		$this->widget_format_to_edit = false;
+		// Backup current registered shortcodes and clear them all out
+		$orig_shortcode_tags = $shortcode_tags;
+		remove_all_shortcodes();
 
-		return $content;
-	}
+		// Register our shortcodes
+		$this->register_shortcodes( array(&$this, 'decode_shortcode_contents_callback') );
 
-	// Reverse changes TinyMCE made to the entered code
-	function TinyMCEDecode( $content ) {
-		if ( !user_can_richedit() || !$this->CheckForBBCode( $content ) ) return $content;
+		// Parse just our shortcodes (that's all that's registered at the moment)
+		$content = do_shortcode( $content );
 
-		// Find all BBCode (remember, it's all slash escaped!)
-		$matches = $this->GetBBCode( $content, TRUE );
-
-		if ( empty($matches) ) return $content; // No BBCode found, we can stop here
-
-		// Loop through each match and decode the code
-		foreach ( (array) $matches as $match ) {
-			$content = str_replace( $match[5], htmlspecialchars_decode( $match[5] ), $content );
-		}
+		// Put the original shortcodes back
+		$shortcode_tags = $orig_shortcode_tags;
 
 		return $content;
 	}
 
 
-	// (Re)Encode the code so TinyMCE will display it correctly
-	function TinyMCEEncode( $content ) {
-		if ( !user_can_richedit() || !$this->CheckForBBCode( $content ) ) return $content;
+	// The callback function for SyntaxHighlighter::encode_shortcode_contents()
+	// It does the actual encoding
+	function encode_shortcode_contents_callback( $atts, $code = '', $tag = false ) {
+		return '[' . $tag . $this->atts2string( $atts ) . ']' . htmlspecialchars( $code ) . "[/$tag]";
+	}
 
-		$matches = $this->GetBBCode( $content );
 
-		if ( empty($matches) ) return $content; // No BBCode found, we can stop here
+	// The callback function for SyntaxHighlighter::decode_shortcode_contents()
+	// It does the actual decoding
+	function decode_shortcode_contents_callback( $atts, $code = '', $tag = false ) {
+		return '[' . $tag . $this->atts2string( $atts ) . ']' . htmlspecialchars_decode( $code ) . "[/$tag]";
+	}
 
-		// Loop through each match and encode the code
-		foreach ( (array) $matches as $match ) {
-			$code = htmlspecialchars( $match[5] );
-			$code = str_replace( '&amp;', '&amp;amp;', $code );
-			$code = str_replace( '&amp;lt;', '&amp;amp;lt;', $code );
-			$code = str_replace( '&amp;gt;', '&amp;amp;gt;', $code );
 
-			$content = str_replace( $match[5], $code, $content );
-		}
+	// Transforms an attributes array into a 'key="value"' format (i.e. reverses the process)
+	function atts2string( $atts ) {
+		if ( empty($atts) )
+			return '';
+
+		$strings = array();
+		foreach ( $atts as $key => $value )
+			$strings[] = $key . '="' . attribute_escape( $value ) . '"';
+
+		return ' ' . implode( ' ', $strings );
+	}
+
+
+	// Filters the post contents. It's a bit of a hack because we need our shortcodes to run pre-wpautop() rather than after.
+	function parse_shortcodes( $content ) {
+		global $shortcode_tags;
+
+		// Backup current registered shortcodes and clear them all out
+		$orig_shortcode_tags = $shortcode_tags;
+		remove_all_shortcodes();
+
+		// Register our shortcodes
+		$this->register_shortcodes( array(&$this, 'shortcode_callback') );
+
+		// Parse just our shortcodes (that's all that's registered at the moment)
+		$content = do_shortcode( $content );
+
+		// Put the original shortcodes back
+		$shortcode_tags = $orig_shortcode_tags;
 
 		return $content;
 	}
 
 
-	// The meat of the plugin. Find all valid BBCode calls and replace them with HTML for the Javascript to handle.
-	function BBCodeToHTML( $content ) {
-		if ( !$this->CheckForBBCode( $content ) ) return $content;
-
-		$matches = $this->GetBBCode( $content );
-
-		if ( empty($matches) ) return $content; // No BBCode found, we can stop here
-
-		// Loop through each match and replace the BBCode with HTML
-		foreach ( (array) $matches as $match ) {
-			$language = strtolower( $match[4] );
-			$content = str_replace( $match[0], '<pre name="code" class="' . $language . "\">\n" . htmlspecialchars( $match[5], ENT_QUOTES ) . "\n</pre>", $content );
-			$this->jsfiles2load[$this->languages[$language]] = TRUE;
-		}
-
-		return $content;
+	// Simple function for escaping just single quotes (the original js_escape() escapes more than we need)
+	function js_escape_singlequotes( $string ) {
+		return str_replace( "'", "\'", $string );
 	}
 
 
-	// Output the HTML to load all of SyntaxHighlighter's Javascript, CSS, and SWF files
-	function FileLoader() {
+	// Output any needed scripts. This is meant for the footer.
+	function maybe_output_scripts() {
+		if ( empty($this->usedbrushes) )
+			return;
+
+		$scripts = array();
+		foreach ( $this->usedbrushes as $brush => $foobar )
+			$scripts[] = 'syntaxhighlighter-brush-' . strtolower( $brush );
+
+		wp_print_scripts( $scripts );
+
 		?>
-
-<!-- SyntaxHighlighter Stuff -->
-<script type="text/javascript" src="<?php echo $this->pluginurl; ?>shCore.js"></script>
-<?php foreach ( $this->jsfiles2load as $filename => $foobar ) : ?>
-<script type="text/javascript" src="<?php echo $this->pluginurl . $filename; ?>"></script>
-<?php endforeach; ?>
 <script type="text/javascript">
-	dp.SyntaxHighlighter.ClipboardSwf = '<?php echo $this->pluginurl; ?>clipboard.swf';
-	dp.SyntaxHighlighter.HighlightAll('code');
+	SyntaxHighlighter.config.clipboardSwf = '<?php echo js_escape( plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/clipboard.swf') ); ?>';
+	SyntaxHighlighter.config.strings.expandSource = '<?php echo $this->js_escape_singlequotes( __( 'expand source', 'syntaxhighlighter' ) ); ?>';
+	SyntaxHighlighter.config.strings.viewSource = '<?php echo $this->js_escape_singlequotes( __( 'view source', 'syntaxhighlighter' ) ); ?>';
+	SyntaxHighlighter.config.strings.copyToClipboard = '<?php echo $this->js_escape_singlequotes( __( 'copy to clipboard', 'syntaxhighlighter' ) ); ?>';
+	SyntaxHighlighter.config.strings.copyToClipboardConfirmation = '<?php echo $this->js_escape_singlequotes( __( 'The code is in your clipboard now', 'syntaxhighlighter' ) ); ?>';
+	SyntaxHighlighter.config.strings.print = '<?php echo $this->js_escape_singlequotes( __( 'print', 'syntaxhighlighter' ) ); ?>';
+	SyntaxHighlighter.config.strings.help = '<?php echo $this->js_escape_singlequotes( __( '?', 'syntaxhighlighter' ) ); ?>';
+	SyntaxHighlighter.config.strings.alert = '<?php echo $this->js_escape_singlequotes( __( 'SyntaxHighlighter\n\n', 'syntaxhighlighter' ) ); ?>';
+	SyntaxHighlighter.config.strings.noBrush = '<?php echo $this->js_escape_singlequotes( __( "Can't find brush for: ", 'syntaxhighlighter' ) ); ?>';
+	SyntaxHighlighter.config.strings.brushNotHtmlScript = '<?php echo $this->js_escape_singlequotes( __( "Brush wasn't configured for html-script option: ", 'syntaxhighlighter' ) ); ?>';
+	SyntaxHighlighter.all();
 </script>
-
 <?php
 	}
-}
 
-// Initiate the plugin class
-$AGSyntaxHighlighter = new AGSyntaxHighlighter();
 
-// For those poor souls stuck on PHP4
-if ( !function_exists( 'htmlspecialchars_decode' ) ) {
-	function htmlspecialchars_decode( $string, $quote_style = ENT_COMPAT ) {
-		return strtr( $string, array_flip( get_html_translation_table( HTML_SPECIALCHARS, $quote_style) ) );
+	// No-name attribute fixing
+	function attributefix( $atts = array() ) {
+		// Quoted value
+		if ( 0 !== preg_match( '#=("|\')(.*?)\1#', $atts[0], $match ) )
+			$atts[0] = $match[2];
+
+		// Unquoted value
+		elseif ( '=' == substr( $atts[0], 0, 1 ) )
+			$atts[0] = substr( $atts[0], 1 );
+
+		return $atts;
+	}
+
+
+	// Shortcode handler for transforming the shortcodes to their final <pre>'s
+	function shortcode_callback( $atts, $code = '', $tag = false ) {
+		if ( false === $tag || empty($code) )
+			return $code;
+
+		// Error fixing for [tag="language"]
+		if ( isset($atts[0]) ) {
+			$atts = $this->attributefix( $atts );
+			$atts['language'] = $atts[0];
+			unset($atts[0]);
+		}
+
+		// Default out all of the available parameters to "false" (easy way to check if they're set or not)
+		// Note this isn't the same as if the user passes the string "false" to the shortcode
+		$atts = shortcode_atts(array(
+			'language'    => false,
+			'lang'        => false,
+			'auto-links'  => false,
+			'class-name'  => false,
+			'collapse'    => false,
+			'first-line'  => false,
+			'gutter'      => false,
+			'highlight'   => false,
+			'html-script' => false,
+			'light'       => false,
+			'ruler'       => false,
+			'toolbar'     => false,
+		), $atts);
+
+
+		// Check for language shortcode tag such as [php]code[/php]
+		if ( isset($this->brushes[$tag]) ) {
+			$lang = $tag;
+		}
+
+		// If a valid tag is not used, it must be sourcecode/source/code
+		else {
+			$atts = $this->attributefix( $atts );
+
+			// Check for the "language" attribute
+			if ( false !== $atts['language'] )
+				$lang = $atts['language'];
+
+			// Check for the "lang" attribute
+			elseif ( false !== $atts['lang'] )
+				$lang = $atts['lang'];
+
+			// Default to plain text
+			else
+				$lang = 'text';
+
+			// Validate passed attribute
+			if ( !isset($this->brushes[$lang]) )
+				return $code;
+		}
+
+		// Ensure lowercase
+		$lang = strtolower( $lang );
+
+		// Register this brush as used so it's script will be outputted
+		$this->usedbrushes[$this->brushes[$lang]] = true;
+
+		$this->usedbrushes['xml'] = true;
+
+		// fully escape all user parameters with attribute_escape() or whatever
+
+		$content = '<pre class="brush: ' . $lang . ';">' . $code . '</pre>';
+
+
+		return $content;
+	}
+
+
+	// PHP4 compatibility
+	function SyntaxHighlighter() {
+		$this->__construct();
 	}
 }
+
+// Start this plugin once all other plugins are fully loaded
+add_action( 'plugins_loaded', 'SyntaxHighlighter' ); function SyntaxHighlighter() { global $SyntaxHighlighter; $SyntaxHighlighter = new SyntaxHighlighter(); }
 
 ?>
