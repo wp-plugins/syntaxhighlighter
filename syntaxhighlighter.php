@@ -180,7 +180,7 @@ class SyntaxHighlighter {
 
 	// HTML entity decode the contents of shortcodes, but only if TinyMCE is to be displayed first
 	function decode_shortcode_contents( $content ) {
-		if ( 'html' != wp_default_editor() )
+		if ( user_can_richedit() && 'html' != wp_default_editor() )
 			return $content;
 
 		global $shortcode_tags;
@@ -262,7 +262,7 @@ class SyntaxHighlighter {
 			return;
 
 		$scripts = array();
-		foreach ( $this->usedbrushes as $brush => $foobar )
+		foreach ( $this->usedbrushes as $brush => $unused )
 			$scripts[] = 'syntaxhighlighter-brush-' . strtolower( $brush );
 
 		wp_print_scripts( $scripts );
