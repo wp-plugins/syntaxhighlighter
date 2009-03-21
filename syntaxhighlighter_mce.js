@@ -2,6 +2,8 @@
 * Syntax Highlighter shortcode plugin v20090208
 */
 
+var syntaxHLcodes = 'sourcecode|source|code|bash|shell|c-sharp|csharp|cpp|c|css|delphi|pas|pascal|diff|patch|groovy|js|jscript|javascript|java|perl|pl|php|plain|text|py|python|rails|ror|ruby|scala|sql|vb|vbnet|xml|xhtml|xslt|html';
+
 (function() {
 	tinymce.create('tinymce.plugins.SyntaxHighlighterPlugin', {
 		init : function(ed, url) {
@@ -33,7 +35,7 @@
 			content = tinymce.trim(content);	
 
 			// 2 <br> get converted to \n\n and are needed to preserve the next <p>
-			content = content.replace(new RegExp('(<pre>\\s*)?(\\[(sourcecode|source|code|bash|shell|c-sharp|csharp|cpp|c|css|delphi|pas|pascal|diff|patch|groovy|js|jscript|javascript|java|perl|pl|php|plain|text|py|python|rails|ror|ruby|scala|sql|vb|vbnet|xml|xhtml|xslt|html).*?\\][\\s\\S]*?\\[\\/\\3\\])(\\s*<\\/pre>)?', 'gi'), '$2<br /><br />');
+			content = content.replace(new RegExp('(<pre>\\s*)?(\\[(' + syntaxHLcodes + ').*?\\][\\s\\S]*?\\[\\/\\3\\])(\\s*<\\/pre>)?', 'gi'), '$2<br /><br />');
 			content = content.replace(/<\/pre>(<br \/><br \/>)?<pre>/gi, '\n');
 
 			return content;
@@ -42,7 +44,7 @@
 		_htmlToVisual : function(content) {
 			content = tinymce.trim(content);
 
-			content = content.replace(new RegExp('(<p>\\s*)?(<pre>\\s*)?(\\[(sourcecode|source|code|bash|shell|c-sharp|csharp|cpp|c|css|delphi|pas|pascal|diff|patch|groovy|js|jscript|javascript|java|perl|pl|php|plain|text|py|python|rails|ror|ruby|scala|sql|vb|vbnet|xml|xhtml|xslt|html).*?\\][\\s\\S]*?\\[\\/\\4\\])(\\s*<\\/pre>)?(\\s*<\\/p>)?', 'gi'), '<pre>$3</pre>');
+			content = content.replace(new RegExp('(<p>\\s*)?(<pre>\\s*)?(\\[(' + syntaxHLcodes + ').*?\\][\\s\\S]*?\\[\\/\\4\\])(\\s*<\\/pre>)?(\\s*<\\/p>)?', 'gi'), '<pre>$3</pre>');
 			content = content.replace(/<\/pre><pre>/gi,	'\n');
 
 			// Remove anonymous, empty paragraphs.

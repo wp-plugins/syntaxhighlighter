@@ -16,8 +16,8 @@ Thanks to:
 * Alex Gorbatchev for writing such an awesome Javascript-powered synatax
   highlighter script
 
-* Automattic who I "stole" the TinyMCE plugin from (although I modified it
-  a bit) and the inspiration for this plugin
+* Automattic for writing the TinyMCE plugin and azaozz for helping me
+  expand it's capabilities for this plugin.
 
 **************************************************************************/
 
@@ -126,7 +126,7 @@ class SyntaxHighlighter {
 
 
 
-		// Temporary until user options implemented
+		// Temporary until user options are implemented
 		wp_enqueue_style( 'syntaxhighlighter-theme-default' );
 	}
 
@@ -287,6 +287,9 @@ class SyntaxHighlighter {
 
 	// No-name attribute fixing
 	function attributefix( $atts = array() ) {
+		if ( empty($atts[0]) )
+			return $atts;
+
 		// Quoted value
 		if ( 0 !== preg_match( '#=("|\')(.*?)\1#', $atts[0], $match ) )
 			$atts[0] = $match[2];
