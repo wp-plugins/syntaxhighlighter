@@ -191,19 +191,23 @@ class SyntaxHighlighter {
 
 
 	// The callback function for SyntaxHighlighter::decode_shortcode_contents()
+	// Shortcode attribute values need to not be quoted for some reason (weird bug)
 	function decode_shortcode_contents_callback( $atts, $code = '', $tag = false ) {
-		return '[' . $tag . $this->atts2string( $atts ) . ']' . htmlspecialchars_decode( $code ) . "[/$tag]";
+		$quotes = ( user_can_richedit() ) ? true : false;
+		return '[' . $tag . $this->atts2string( $atts, $quotes ) . ']' . htmlspecialchars_decode( $code ) . "[/$tag]";
 	}
 
 
 	// Transforms an attributes array into a 'key="value"' format (i.e. reverses the process)
-	function atts2string( $atts ) {
+	function atts2string( $atts, $quotes = true ) {
 		if ( empty($atts) )
 			return '';
 
+		$atts = $this->attributefix( $atts );
+
 		$strings = array();
 		foreach ( $atts as $key => $value )
-			$strings[] = $key . '="' . attribute_escape( $value ) . '"';
+			$strings[] = ( $quotes ) ? $key . '="' . attribute_escape( $value ) . '"' : $key . '=' . attribute_escape( $value );
 
 		return ' ' . implode( ' ', $strings );
 	}
