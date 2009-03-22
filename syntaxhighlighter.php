@@ -28,7 +28,7 @@ class SyntaxHighlighter {
 	var $themes      = array();   // Array of themes
 	var $usedbrushes = array();   // Stores used brushes so we know what to output
 
-	// Initalize the plugin by registering our hooks
+	// Initalize the plugin by registering the hooks
 	function __construct() {
 		// Check WordPress version
 		if ( !function_exists( 'plugins_url' ) ) return;
@@ -55,7 +55,7 @@ class SyntaxHighlighter {
 		wp_register_script( 'syntaxhighlighter-brush-xml',        plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushXml.js'),        array('syntaxhighlighter-core'), $this->agshver );
 
 		// Register theme stylesheets and enqueue the core stylesheet
-		// Stylesheets need to be in the <head>, so we're forced to always load it there
+		// Stylesheets need to be in the <head>, so they can't be loaded on demand
 		wp_enqueue_style(   'syntaxhighlighter-core',             plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shCore.css'),            array(),                         $this->agshver );
 		wp_register_style(  'syntaxhighlighter-theme-default',    plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeDefault.css'),    array('syntaxhighlighter-core'), $this->agshver );
 		wp_register_style(  'syntaxhighlighter-theme-django',     plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeDjango.css'),     array('syntaxhighlighter-core'), $this->agshver );
@@ -132,67 +132,28 @@ class SyntaxHighlighter {
 
 
 	// Add the custom TinyMCE plugin which wraps plugin shortcodes in <pre> in TinyMCE
-	// This plugin is based on one from WordPress.com
 	function add_tinymce_plugin( $plugins ) {
 		$plugins['syntaxhighlighter'] = plugins_url('/syntaxhighlighter/syntaxhighlighter_mce.js');
 		return $plugins;
 	}
 
 
-	// Helper function for registering all plugin shortcodes
-	function register_shortcodes( $callback ) {
+	// A filter function that runs do_shortcode() but only with this plugin's shortcodes
+	function shortcode_hack( $content, $callback ) {
+		global $shortcode_tags;
+
+		// Backup current registered shortcodes and clear them all out
+		$orig_shortcode_tags = $shortcode_tags;
+		remove_all_shortcodes();
+
+		// Register all of this plugin's shortcodes
 		add_shortcode( 'sourcecode', $callback );
 		add_shortcode( 'source', $callback );
 		add_shortcode( 'code', $callback );
 		foreach ( $this->brushes as $shortcode => $brush )
 			add_shortcode( $shortcode, $callback );
-	}
 
-
-	// Helper function for doing the shortcode hack
-//	function 
-
-
-	// HTML entity encode the contents of shortcodes
-	function encode_shortcode_contents( $content ) {
-		global $shortcode_tags;
-
-		// The content comes raw from the $_POST and as such is slash escaped
-		$content = stripslashes( $content );
-
-		// Backup current registered shortcodes and clear them all out
-		$orig_shortcode_tags = $shortcode_tags;
-		remove_all_shortcodes();
-
-		// Register our shortcodes
-		$this->register_shortcodes( array(&$this, 'encode_shortcode_contents_callback') );
-
-		// Parse just our shortcodes (that's all that's registered at the moment)
-		$content = do_shortcode( $content );
-
-		// Put the original shortcodes back
-		$shortcode_tags = $orig_shortcode_tags;
-
-		// The content came in slashed so it needs to go out slashed
-		return addslashes( $content );
-	}
-
-
-	// HTML entity decode the contents of shortcodes, but only if TinyMCE is to be displayed first
-	function decode_shortcode_contents( $content ) {
-		if ( user_can_richedit() && 'html' != wp_default_editor() )
-			return $content;
-
-		global $shortcode_tags;
-
-		// Backup current registered shortcodes and clear them all out
-		$orig_shortcode_tags = $shortcode_tags;
-		remove_all_shortcodes();
-
-		// Register our shortcodes
-		$this->register_shortcodes( array(&$this, 'decode_shortcode_contents_callback') );
-
-		// Parse just our shortcodes (that's all that's registered at the moment)
+		// Do the shortcodes (only this plugins's are registered)
 		$content = do_shortcode( $content );
 
 		// Put the original shortcodes back
@@ -202,15 +163,34 @@ class SyntaxHighlighter {
 	}
 
 
+	// The main filter for the post contents. The regular shortcode filter can't be used as it's post-wpautop().
+	function parse_shortcodes( $content ) {
+		return $this->shortcode_hack( $content, array(&$this, 'shortcode_callback') );
+	}
+
+
+	// HTML entity encode the contents of shortcodes. Note this handles $_POST-sourced data, so it has to deal with slashes
+	function encode_shortcode_contents( $content ) {
+		return addslashes( $this->shortcode_hack( stripslashes( $content ), array(&$this, 'encode_shortcode_contents_callback') ) );
+	}
+
+
+	// HTML entity decode the contents of shortcodes, but only if TinyMCE is to be displayed first
+	function decode_shortcode_contents( $content ) {
+		if ( user_can_richedit() && 'html' != wp_default_editor() )
+			return $content;
+
+		return $this->shortcode_hack( $content, array(&$this, 'decode_shortcode_contents_callback') );
+	}
+
+
 	// The callback function for SyntaxHighlighter::encode_shortcode_contents()
-	// It does the actual encoding
 	function encode_shortcode_contents_callback( $atts, $code = '', $tag = false ) {
 		return '[' . $tag . $this->atts2string( $atts ) . ']' . htmlspecialchars( $code ) . "[/$tag]";
 	}
 
 
 	// The callback function for SyntaxHighlighter::decode_shortcode_contents()
-	// It does the actual decoding
 	function decode_shortcode_contents_callback( $atts, $code = '', $tag = false ) {
 		return '[' . $tag . $this->atts2string( $atts ) . ']' . htmlspecialchars_decode( $code ) . "[/$tag]";
 	}
@@ -226,27 +206,6 @@ class SyntaxHighlighter {
 			$strings[] = $key . '="' . attribute_escape( $value ) . '"';
 
 		return ' ' . implode( ' ', $strings );
-	}
-
-
-	// Filters the post contents. It's a bit of a hack because we need our shortcodes to run pre-wpautop() rather than after.
-	function parse_shortcodes( $content ) {
-		global $shortcode_tags;
-
-		// Backup current registered shortcodes and clear them all out
-		$orig_shortcode_tags = $shortcode_tags;
-		remove_all_shortcodes();
-
-		// Register our shortcodes
-		$this->register_shortcodes( array(&$this, 'shortcode_callback') );
-
-		// Parse just our shortcodes (that's all that's registered at the moment)
-		$content = do_shortcode( $content );
-
-		// Put the original shortcodes back
-		$shortcode_tags = $orig_shortcode_tags;
-
-		return $content;
 	}
 
 
