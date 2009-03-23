@@ -27,6 +27,7 @@ class SyntaxHighlighter {
 	var $brushes     = array();   // Array of aliases => brushes
 	var $themes      = array();   // Array of themes
 	var $usedbrushes = array();   // Stores used brushes so we know what to output
+	var $encoded     = false;     // Used to mark that a character encode took place
 
 	// Initalize the plugin by registering the hooks
 	function __construct() {
@@ -67,9 +68,10 @@ class SyntaxHighlighter {
 		// Register hooks
 		add_filter( 'the_content',          array(&$this, 'parse_shortcodes'),          9 );
 		add_action( 'wp_footer',            array(&$this, 'maybe_output_scripts'),      15 );
-		add_filter( 'content_save_pre',     array(&$this, 'encode_shortcode_contents'), 1 );
-		add_filter( 'the_editor_content',   array(&$this, 'decode_shortcode_contents'), 1 );
 		add_filter( 'mce_external_plugins', array(&$this, 'add_tinymce_plugin') );
+		add_filter( 'the_editor_content',   array(&$this, 'decode_shortcode_contents'), 1 );
+		add_filter( 'content_save_pre',     array(&$this, 'encode_shortcode_contents'), 1 );
+		add_filter( 'save_post',            array(&$this, 'mark_as_encoded'),           10, 2 );
 
 		// Create list of brush aliases and map them to their real brushes
 		$this->brushes = array(
@@ -171,12 +173,14 @@ class SyntaxHighlighter {
 
 	// HTML entity encode the contents of shortcodes. Note this handles $_POST-sourced data, so it has to deal with slashes
 	function encode_shortcode_contents( $content ) {
+		$this->encoded = true;
 		return addslashes( $this->shortcode_hack( stripslashes( $content ), array(&$this, 'encode_shortcode_contents_callback') ) );
 	}
 
 
-	// HTML entity decode the contents of shortcodes, but only if TinyMCE is to be displayed first
+	// HTML entity decode the contents of shortcodes
 	function decode_shortcode_contents( $content ) {
+		// If TinyMCE is enabled and set to be displayed first, leave it encoded
 		if ( user_can_richedit() && 'html' != wp_default_editor() )
 			return $content;
 
@@ -191,10 +195,19 @@ class SyntaxHighlighter {
 
 
 	// The callback function for SyntaxHighlighter::decode_shortcode_contents()
-	// Shortcode attribute values need to not be quoted for some reason (weird bug)
+	// Shortcode attribute values need to not be quoted with TinyMCE disabled for some reason (weird bug)
 	function decode_shortcode_contents_callback( $atts, $code = '', $tag = false ) {
 		$quotes = ( user_can_richedit() ) ? true : false;
 		return '[' . $tag . $this->atts2string( $atts, $quotes ) . ']' . htmlspecialchars_decode( $code ) . "[/$tag]";
+	}
+
+
+	// Adds a post meta saying that HTML entities are encoded (for backwards compatibility)
+	function mark_as_encoded( $post_ID, $post ) {
+		if ( false == $this->encoded || 'revision' == $post->post_type )
+			return;
+
+		add_post_meta( $post_ID, 'syntaxhighlighter_encoded', true, true );
 	}
 
 
@@ -267,6 +280,8 @@ class SyntaxHighlighter {
 
 	// Shortcode handler for transforming the shortcodes to their final <pre>'s
 	function shortcode_callback( $atts, $code = '', $tag = false ) {
+		global $post;
+
 		if ( false === $tag || empty($code) )
 			return $code;
 
@@ -331,8 +346,9 @@ class SyntaxHighlighter {
 
 		// fully escape all user parameters with attribute_escape() or whatever
 
-		$content = '<pre class="brush: ' . $lang . ';">' . $code . '</pre>';
-
+		$content  = '<pre class="brush: ' . $lang . ';">';
+		$content .= ( get_post_meta( $post->ID, 'syntaxhighlighter_encoded', true ) ) ? $code : htmlspecialchars( $code );
+		$content .= '</pre>';
 
 		return $content;
 	}
