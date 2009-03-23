@@ -342,11 +342,23 @@ class SyntaxHighlighter {
 		// Register this brush as used so it's script will be outputted
 		$this->usedbrushes[$this->brushes[$lang]] = true;
 
-		$this->usedbrushes['xml'] = true;
+		$params = array();
+		$params[] = "brush: $lang;";
 
-		// fully escape all user parameters with attribute_escape() or whatever
+		foreach ( $atts as $key => $value ) {
+			if ( false === $value || in_array( $key, array( 'language', 'lang' ) ) )
+				continue;
 
-		$content  = '<pre class="brush: ' . $lang . ';">';
+			if ( $key == 'html-script' && ( 'true' == $value || '1' == $value ) )
+				$this->usedbrushes['xml'] = true;
+
+			if ( 'highlight' == $key )
+				$params[] = "$key: [$value];";
+			else
+				$params[] = "$key: $value;";
+		}
+
+		$content  = '<pre class="' . attribute_escape( implode( ' ', $params ) ) . '">';
 		$content .= ( get_post_meta( $post->ID, 'syntaxhighlighter_encoded', true ) ) ? $code : htmlspecialchars( $code );
 		$content .= '</pre>';
 
