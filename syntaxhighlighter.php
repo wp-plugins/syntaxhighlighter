@@ -34,6 +34,9 @@ class SyntaxHighlighter {
 		// Check WordPress version
 		if ( !function_exists( 'plugins_url' ) ) return;
 
+		// Load localization domain
+		load_plugin_textdomain( 'syntaxhighlighter', FALSE, '/syntaxhighlighter/localization' );
+
 		// Register brush scripts
 		wp_register_script( 'syntaxhighlighter-core',             plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shCore.js'),            array(),                         $this->agshver );
 		wp_register_script( 'syntaxhighlighter-brush-bash',       plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushBash.js'),       array('syntaxhighlighter-core'), $this->agshver );
@@ -373,6 +376,6 @@ class SyntaxHighlighter {
 }
 
 // Start this plugin once all other plugins are fully loaded
-add_action( 'plugins_loaded', 'SyntaxHighlighter' ); function SyntaxHighlighter() { global $SyntaxHighlighter; $SyntaxHighlighter = new SyntaxHighlighter(); }
+add_action( 'init', 'SyntaxHighlighter' ); function SyntaxHighlighter() { global $SyntaxHighlighter; $SyntaxHighlighter = new SyntaxHighlighter(); }
 
 ?>
