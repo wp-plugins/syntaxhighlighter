@@ -60,9 +60,8 @@ class SyntaxHighlighter {
 		wp_register_script( 'syntaxhighlighter-brush-vb',         plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushVb.js'),         array('syntaxhighlighter-core'), $this->agshver );
 		wp_register_script( 'syntaxhighlighter-brush-xml',        plugins_url('/syntaxhighlighter/syntaxhighlighter/scripts/shBrushXml.js'),        array('syntaxhighlighter-core'), $this->agshver );
 
-		// Register theme stylesheets and enqueue the core stylesheet
-		// Stylesheets need to be in the <head>, so they can't be loaded on demand
-		wp_enqueue_style(   'syntaxhighlighter-core',             plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shCore.css'),            array(),                         $this->agshver );
+		// Register theme stylesheets
+		wp_register_style(  'syntaxhighlighter-core',             plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shCore.css'),            array(),                         $this->agshver );
 		wp_register_style(  'syntaxhighlighter-theme-default',    plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeDefault.css'),    array('syntaxhighlighter-core'), $this->agshver );
 		wp_register_style(  'syntaxhighlighter-theme-django',     plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeDjango.css'),     array('syntaxhighlighter-core'), $this->agshver );
 		wp_register_style(  'syntaxhighlighter-theme-emacs',      plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeEmacs.css'),      array('syntaxhighlighter-core'), $this->agshver );
@@ -442,6 +441,8 @@ class SyntaxHighlighter {
 		</tr>
 	</table>
 
+	<h3><?php _e('Defaults', 'syntaxhighlighter'); ?></h3>
+
 	<p><?php _e('All of the settings below can also be configured on a per-code box basis.', 'syntaxhighlighter'); ?></p>
 
 	<table class="form-table">
@@ -485,6 +486,14 @@ class SyntaxHighlighter {
 	</p>
 
 	</form>
+
+	<h3><?php _e('Preview', 'syntaxhighlighter'); ?></h3>
+
+	<p><?php _e('Click &quot;Save Changes&quot; to update this preview.', 'syntaxhighlighter'); ?>
+
+	<?php global $post; $post->ID = 0; echo $this->parse_shortcodes( "[php]<?php echo 'Hello world!'; ?>[/php]" ); ?>
+
+<?php $this->maybe_output_scripts(); ?>
 
 </div>
 
