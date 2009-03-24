@@ -23,11 +23,13 @@ Thanks to:
 
 class SyntaxHighlighter {
 	// All of these variables are private. Filters are provided for things that can be modified.
-	var $agshver     = '2.0.296'; // Alex Gorbatchev's SyntaxHighlighter version
-	var $brushes     = array();   // Array of aliases => brushes
-	var $themes      = array();   // Array of themes
-	var $usedbrushes = array();   // Stores used brushes so we know what to output
-	var $encoded     = false;     // Used to mark that a character encode took place
+	var $agshver         = '2.0.296'; // Alex Gorbatchev's SyntaxHighlighter version
+	var $settings        = array();   // Contains the user's settings
+	var $defaultsettings = array();   // Contains the default settings
+	var $brushes         = array();   // Array of aliases => brushes
+	var $themes          = array();   // Array of themes
+	var $usedbrushes     = array();   // Stores used brushes so we know what to output
+	var $encoded         = false;     // Used to mark that a character encode took place
 
 	// Initalize the plugin by registering the hooks
 	function __construct() {
@@ -69,12 +71,14 @@ class SyntaxHighlighter {
 		wp_register_style(  'syntaxhighlighter-theme-rdark',      plugins_url('/syntaxhighlighter/syntaxhighlighter/styles/shThemeRDark.css'),      array('syntaxhighlighter-core'), $this->agshver );
 
 		// Register hooks
-		add_filter( 'the_content',          array(&$this, 'parse_shortcodes'),          9 );
-		add_action( 'wp_footer',            array(&$this, 'maybe_output_scripts'),      15 );
-		add_filter( 'mce_external_plugins', array(&$this, 'add_tinymce_plugin') );
-		add_filter( 'the_editor_content',   array(&$this, 'decode_shortcode_contents'), 1 );
-		add_filter( 'content_save_pre',     array(&$this, 'encode_shortcode_contents'), 1 );
-		add_filter( 'save_post',            array(&$this, 'mark_as_encoded'),           10, 2 );
+		add_action( 'admin_menu',                   array(&$this, 'register_settings_page') );
+		add_action( 'admin_post_syntaxhighlighter', array(&$this, 'save_settings') );
+		add_filter( 'the_content',                  array(&$this, 'parse_shortcodes'),          9 );
+		add_action( 'wp_footer',                    array(&$this, 'maybe_output_scripts'),      15 );
+		add_filter( 'mce_external_plugins',         array(&$this, 'add_tinymce_plugin') );
+		add_filter( 'the_editor_content',           array(&$this, 'decode_shortcode_contents'), 1 );
+		add_filter( 'content_save_pre',             array(&$this, 'encode_shortcode_contents'), 1 );
+		add_filter( 'save_post',                    array(&$this, 'mark_as_encoded'),           10, 2 );
 
 		// Create list of brush aliases and map them to their real brushes
 		$this->brushes = array(
@@ -127,12 +131,51 @@ class SyntaxHighlighter {
 			'rdark'      => __( 'RDark',        'syntaxhighlighter' ),
 		) );
 
+		// Create array of default settings (you can use the filter to modify these)
+		$this->defaultsettings = apply_filters( 'syntaxhighlighter_defaultsettings', array(
+			'theme'      => 'default',
+			'autolinks'  => 1,
+			'classname'  => '',
+			'collapse'   => 0,
+			'firstline'  => 1,
+			'fontsize'   => 100,
+			'gutter'     => 1,
+			'htmlscript' => 0,
+			'light'      => 0,
+			'ruler'      => 0,
+			'smarttabs'  => 1,
+			'tabsize'    => 4,
+			'toolbar'    => 1,
+		) );
+
+		// Setup the settings by using the default as a base and then adding in any changed values
+		// This allows settings arrays from old versions to be used even though they are missing values
+		$usersettings = (array) get_option('syntaxhighlighter_options');
+		$this->settings = $this->defaultsettings;
+		if ( $usersettings !== $this->defaultsettings ) {
+			foreach ( (array) $usersettings as $key1 => $value1 ) {
+				if ( is_array($value1) ) {
+					foreach ( $value1 as $key2 => $value2 ) {
+						$this->settings[$key1][$key2] = $value2;
+					}
+				} else {
+					$this->settings[$key1] = $value1;
+				}
+			}
+		}
+
 
 
 
 
 		// Temporary until user options are implemented
 		wp_enqueue_style( 'syntaxhighlighter-theme-default' );
+	}
+
+
+	// Register the settings page
+	function register_settings_page() {
+		add_options_page( __('SyntaxHighlighter Settings', 'syntaxhighlighter'), __('SyntaxHighlighter', 'syntaxhighlighter'), 'manage_options', 'syntaxhighlighter', array(&$this, 'settings_page') );
 	}
 
 
@@ -366,6 +409,92 @@ class SyntaxHighlighter {
 		$content .= '</pre>';
 
 		return $content;
+	}
+
+
+	// Settings page
+	function settings_page() { ?>
+
+<div class="wrap">
+<?php if ( function_exists('screen_icon') ) screen_icon(); ?>
+	<h2><?php _e( 'SyntaxHighlighter Settings', 'syntaxhighlighter' ); ?></h2>
+
+	<form method="post" action="admin-post.php">
+
+	<?php wp_nonce_field('syntaxhighlighter'); ?>
+
+	<input type="hidden" name="action" value="syntaxhighlighter" />
+
+	<table class="form-table">
+		<tr valign="top">
+			<th scope="row"><label for="syntaxhighlighter_theme"><?php _e('Color Theme', 'syntaxhighlighter'); ?></label></th>
+			<td>
+				<select name="syntaxhighlighter_theme" id="syntaxhighlighter_theme" class="postform">
+<?php
+					foreach ( $this->themes as $theme => $name ) {
+						echo '					<option value="' . attribute_escape($theme) . '"';
+						selected( $this->settings['theme'], $theme );
+						echo '>' . htmlspecialchars($name) . "</option>\n";
+					}
+?>
+				</select>
+			</td>
+		</tr>
+	</table>
+
+	<p><?php _e('All of the settings below can also be configured on a per-code box basis.', 'syntaxhighlighter'); ?></p>
+
+	<table class="form-table">
+		<tr valign="top">
+			<th scope="row"><?php _e('Miscellaneous', 'syntaxhighlighter'); ?></th>
+			<td>
+				<fieldset>
+					<legend class="hidden"><?php _e('Miscellaneous', 'syntaxhighlighter'); ?></legend>
+
+					<label for="syntaxhighlighter_gutter"><input name="syntaxhighlighter_gutter" type="checkbox" id="syntaxhighlighter_gutter" value="1" <?php checked( $this->settings['gutter'], 1 ); ?> /> <?php _e('Display line numbers', 'syntaxhighlighter'); ?></label><br />
+					<label for="syntaxhighlighter_toolbar"><input name="syntaxhighlighter_toolbar" type="checkbox" id="syntaxhighlighter_toolbar" value="1" <?php checked( $this->settings['toolbar'], 1 ); ?> /> <?php _e('Display the toolbar', 'syntaxhighlighter'); ?></label><br />
+					<label for="syntaxhighlighter_autolinks"><input name="syntaxhighlighter_autolinks" type="checkbox" id="syntaxhighlighter_autolinks" value="1" <?php checked( $this->settings['autolinks'], 1 ); ?> /> <?php _e('Automatically make URLs clickable', 'syntaxhighlighter'); ?></label><br />
+					<label for="syntaxhighlighter_collapse"><input name="syntaxhighlighter_collapse" type="checkbox" id="syntaxhighlighter_collapse" value="1" <?php checked( $this->settings['collapse'], 1 ); ?> /> <?php _e('Collapse code boxes', 'syntaxhighlighter'); ?></label><br />
+					<label for="syntaxhighlighter_ruler"><input name="syntaxhighlighter_ruler" type="checkbox" id="syntaxhighlighter_ruler" value="1" <?php checked( $this->settings['ruler'], 1 ); ?> /> <?php _e('Show a ruler column along the top of the code box', 'syntaxhighlighter'); ?></label><br />
+					<label for="syntaxhighlighter_light"><input name="syntaxhighlighter_light" type="checkbox" id="syntaxhighlighter_light" value="1" <?php checked( $this->settings['light'], 1 ); ?> /> <?php _e('Use the light display mode, best for single lines of code', 'syntaxhighlighter'); ?></label><br />
+					<label for="syntaxhighlighter_smarttabs"><input name="syntaxhighlighter_smarttabs" type="checkbox" id="syntaxhighlighter_smarttabs" value="1" <?php checked( $this->settings['smarttabs'], 1 ); ?> /> <?php _e('Use smart tabs allowing tabs being used for alignment', 'syntaxhighlighter'); ?></label><br />
+					<label for="syntaxhighlighter_htmlscript"><input name="syntaxhighlighter_htmlscript" type="checkbox" id="syntaxhighlighter_htmlscript" value="1" <?php checked( $this->settings['htmlscript'], 1 ); ?> /> <?php _e('If mixing HTML/XML code with other code, highlight both languages', 'syntaxhighlighter'); ?></label><br />
+				</fieldset>
+			</td>
+		</tr>
+		<tr valign="top">
+			<th scope="row"><label for="syntaxhighlighter_classname"><?php _e('Additional CSS Class(es)', 'syntaxhighlighter'); ?></label></th>
+			<td><input name="syntaxhighlighter_classname" type="text" id="syntaxhighlighter_classname" value="<?php echo attribute_escape( $this->settings['classname'] ); ?>" class="regular-text" /></td>
+		</tr>
+		<tr valign="top">
+			<th scope="row"><label for="syntaxhighlighter_firstline"><?php _e('Starting Line Number', 'syntaxhighlighter'); ?></label></th>
+			<td><input name="syntaxhighlighter_firstline" type="text" id="syntaxhighlighter_firstline" value="<?php echo attribute_escape( $this->settings['firstline'] ); ?>" class="small-text" /></td>
+		</tr>
+		<tr valign="top">
+			<th scope="row"><label for="syntaxhighlighter_fontsize"><?php _e('Font Size (Percentage)', 'syntaxhighlighter'); ?></label></th>
+			<td><input name="syntaxhighlighter_fontsize" type="text" id="syntaxhighlighter_fontsize" value="<?php echo attribute_escape( $this->settings['fontsize'] ); ?>" class="small-text" />%</td>
+		</tr>
+		<tr valign="top">
+			<th scope="row"><label for="syntaxhighlighter_tabsize"><?php _e('Tab Size', 'syntaxhighlighter'); ?></label></th>
+			<td><input name="syntaxhighlighter_tabsize" type="text" id="syntaxhighlighter_tabsize" value="<?php echo attribute_escape( $this->settings['tabsize'] ); ?>" class="small-text" /></td>
+		</tr>
+	</table>
+
+	<p class="submit">
+		<input type="submit" name="Submit" class="button-primary" value="<?php _e('Save Changes') ?>" />
+	</p>
+
+	</form>
+
+</div>
+
+<?php
+	}
+
+
+	// Handle the results of the settings page
+	function save_settings() {
+		echo 'Not coded yet!';
 	}
 
 
