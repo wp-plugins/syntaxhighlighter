@@ -23,6 +23,7 @@ Thanks to:
 
 class SyntaxHighlighter {
 	// All of these variables are private. Filters are provided for things that can be modified.
+	var $pluginver       = '2.0.0';   // Plugin version
 	var $agshver         = '2.0.296'; // Alex Gorbatchev's SyntaxHighlighter version
 	var $settings        = array();   // Contains the user's settings
 	var $defaultsettings = array();   // Contains the default settings
@@ -72,15 +73,17 @@ class SyntaxHighlighter {
 		// Register hooks
 		add_action( 'admin_menu',                   array(&$this, 'register_settings_page') );
 		add_action( 'admin_post_syntaxhighlighter', array(&$this, 'save_settings') );
+		add_action( 'admin_head',                   array(&$this, 'output_javascript_shortcodes') );
 		add_filter( 'the_content',                  array(&$this, 'parse_shortcodes'),          9 );
 		add_action( 'wp_footer',                    array(&$this, 'maybe_output_scripts'),      15 );
 		add_filter( 'mce_external_plugins',         array(&$this, 'add_tinymce_plugin') );
+		add_filter( 'tiny_mce_version',             array(&$this, 'break_tinymce_cache') );
 		add_filter( 'the_editor_content',           array(&$this, 'decode_shortcode_contents'), 1 );
 		add_filter( 'content_save_pre',             array(&$this, 'encode_shortcode_contents'), 1 );
 		add_filter( 'save_post',                    array(&$this, 'mark_as_encoded'),           10, 2 );
 
 		// Create list of brush aliases and map them to their real brushes
-		$this->brushes = array(
+		$this->brushes = apply_filters( 'syntaxhighlighter_brushes', array(
 			'bash'       => 'bash',
 			'shell'      => 'bash',
 			'c-sharp'    => 'csharp',
@@ -117,7 +120,7 @@ class SyntaxHighlighter {
 			'xslt'       => 'xml',
 			'html'       => 'xml',
 			'xhtml'      => 'xml',
-		);
+		) );
 
 		// Create list of themes and their human readable names
 		// Plugins can add to this list as long as they also register a style with the handle "syntaxhighlighter-theme-THEMENAMEHERE"
@@ -179,6 +182,28 @@ class SyntaxHighlighter {
 	function add_tinymce_plugin( $plugins ) {
 		$plugins['syntaxhighlighter'] = plugins_url('/syntaxhighlighter/syntaxhighlighter_mce.js');
 		return $plugins;
+	}
+
+
+	// Break the TinyMCE cache
+	function break_tinymce_cache( $version ) {
+		return $version . '-syntaxhighlighter' . $this->version;
+	}
+
+
+	// Output list of shortcode tags for the TinyMCE plugin
+	function output_javascript_shortcodes() {
+		$tags = array();
+		$tags[] = 'sourcecode';
+		$tags[] = 'source';
+		$tags[] = 'code';
+
+		foreach ( $this->brushes as $tag => $brush )
+			$tags[] = preg_quote( $tag );
+
+		echo "<script type='text/javascript'>\n";
+		echo "	var syntaxHLcodes = '" . implode( '|', $tags ) . "';\n";
+		echo "</script>\n";
 	}
 
 
@@ -422,11 +447,17 @@ class SyntaxHighlighter {
 		$params = array();
 		$params[] = "brush: $lang;";
 
+		// Fix bug that prevents collapse from working if the toolbar is off
+		if ( 1 == $atts['collapse'] || 'true' == $atts['collapse'] ) {
+			$atts['toolbar'] = 'true';
+			$atts['light'] = 'false';
+		}
+
 		foreach ( $atts as $key => $value ) {
 			if ( false === $value || in_array( $key, array( 'language', 'lang' ) ) )
 				continue;
 
-			if ( $key == 'html-script' && ( 'true' == $value || '1' == $value ) )
+			if ( $key == 'html-script' && ( 'true' == $value || 1 == $value ) )
 				$this->usedbrushes['xml'] = true;
 
 			if ( 'highlight' == $key )
