@@ -187,7 +187,7 @@ class SyntaxHighlighter {
 
 	// Break the TinyMCE cache
 	function break_tinymce_cache( $version ) {
-		return $version . '-syntaxhighlighter' . $this->version;
+		return $version . '-syntaxhighlighter' . $this->pluginver;
 	}
 
 

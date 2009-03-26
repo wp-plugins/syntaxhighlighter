@@ -49,8 +49,8 @@
 			// Remove anonymous, empty paragraphs.
 			content = content.replace(/<p>(\s|&nbsp;)*<\/p>/mg, '');
 
-			// Look for <p> <br> in [php], replace with <br />
-			content = content.replace(/\[php[^\]]*\][\s\S]+?\[\/php\]/g, function(a) {
+			// Look for <p> <br> in the [tag]s, replace with <br />
+			content = content.replace(new RegExp('\\[(' + syntaxHLcodes + ')[^\\]]*\\][\\s\\S]+?\\[\\/\\1\\]', 'gi'), function(a) {
 				return a.replace(/<br ?\/?>[\r\n]*/g, '<br />').replace(/<\/?p( [^>]*)?>[\r\n]*/g, '<br />');
 			});
 
@@ -63,16 +63,16 @@
 })();
 
 function pre_wpautop2(content) {
-	content = content.replace(/\[php[^\]]*\][\s\S]+?\[\/php\]/g, function(a) {
+	content = content.replace(new RegExp('\\[(' + syntaxHLcodes + ')[^\\]]*\\][\\s\\S]+?\\[\\/\\1\\]', 'gi'), function(a) {
 		return a.replace(/<br ?\/?>[\r\n]*/g, '<wp_temp>').replace(/<\/?p( [^>]*)?>[\r\n]*/g, '<wp_temp>');
 	});
 
-	content = content.replace(/<pre>\s*\[php/gi, '[php');
-	content = content.replace(/\[\/php\]\s*<\/pre>/gi, '[/php]');
+	content = content.replace(new RegExp('<pre>\\s*\\[(' + syntaxHLcodes + ')', 'gi'), '[$1');
+	content = content.replace(new RegExp('\\[\\/(' + syntaxHLcodes + ')\\]\\s*<\\/pre>', 'gi'), '[/$1]');
 
 	content = this._pre_wpautop(content);
 
-	content = content.replace(/\[php[^\]]*\][\s\S]+?\[\/php\]/g, function(a) {
+	content = content.replace(new RegExp('\\[(' + syntaxHLcodes + ')[^\\]]*\\][\\s\\S]+?\\[\\/\\1\\]', 'gi'), function(a) {
 		return a.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 	});
 
@@ -82,7 +82,7 @@ function pre_wpautop2(content) {
 function wpautop2(content) {
 
 	// js htmlspecialchars
-	content = content.replace(/\[php[^\]]*\][\s\S]+?\[\/php\]/g, function(a) {
+	content = content.replace(new RegExp('\\[(' + syntaxHLcodes + ')[^\\]]*\\][\\s\\S]+?\\[\\/\\1\\]', 'gi'), function(a) {
 		return a.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 	});
 
