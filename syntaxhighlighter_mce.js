@@ -1,6 +1,7 @@
 /*
-* Syntax Highlighter shortcode plugin v20090208
-*/
+ * Syntax Highlighter shortcode plugin
+ * Based on v20090208 from WordPress.com
+ */
 
 var syntaxHLcodes = 'sourcecode|source|code|bash|shell|c-sharp|csharp|cpp|c|css|delphi|pas|pascal|diff|patch|groovy|js|jscript|javascript|java|perl|pl|php|plain|text|py|python|rails|ror|ruby|scala|sql|vb|vbnet|xml|xhtml|xslt|html';
 
