@@ -396,7 +396,7 @@ class SyntaxHighlighter {
 
 		// Default out all of the available parameters to "false" (easy way to check if they're set or not)
 		// Note this isn't the same as if the user passes the string "false" to the shortcode
-		$atts = shortcode_atts(array(
+		$atts = apply_filters( 'syntaxhighlighter_shortcodeatts', shortcode_atts( array(
 			'language'    => false,
 			'lang'        => false,
 			'auto-links'  => false,
@@ -409,7 +409,7 @@ class SyntaxHighlighter {
 			'light'       => false,
 			'ruler'       => false,
 			'toolbar'     => false,
-		), $atts);
+		), $atts ) );
 
 
 		// Check for language shortcode tag such as [php]code[/php]
@@ -452,6 +452,10 @@ class SyntaxHighlighter {
 			$atts['toolbar'] = 'true';
 			$atts['light'] = 'false';
 		}
+
+		// Enable "htmlscript" for certain brushes
+		if ( false === $atts['html-script'] && in_array( $lang, apply_filters( 'syntaxhighlighter_htmlscriptbrushes', array( 'php' ) ) ) )
+			$atts['html-script'] = 'true';
 
 		foreach ( $atts as $key => $value ) {
 			if ( false === $value || in_array( $key, array( 'language', 'lang' ) ) )
