@@ -4,7 +4,7 @@
 
 Plugin Name:  SyntaxHighlighter
 Plugin URI:   http://www.viper007bond.com/wordpress-plugins/syntaxhighlighter/
-Version:      2.0.0 Alpha
+Version:      2.0.0 Beta
 Description:  Easily post code to your blog while still maintaining complete control over it's display. Uses Alex Gorbatchev's <a href="http://code.google.com/p/syntaxhighlighter/">SyntaxHighlighter</a> and code by <a href="http://automattic.com/">Automattic</a>.
 Author:       Viper007Bond
 Author URI:   http://www.viper007bond.com/
@@ -131,6 +131,7 @@ class SyntaxHighlighter {
 			'fadetogrey' => __( 'Fade to Grey', 'syntaxhighlighter' ),
 			'midnight'   => __( 'Midnight',     'syntaxhighlighter' ),
 			'rdark'      => __( 'RDark',        'syntaxhighlighter' ),
+			'none'       => __( '[None]',       'syntaxhighlighter' ),
 		) );
 
 		// Create array of default settings (you can use the filter to modify these)
@@ -166,8 +167,12 @@ class SyntaxHighlighter {
 		}
 
 		// Load the user's selected theme
-		$theme = ( !empty($this->themes[$this->settings['theme']]) ) ? strtolower($this->settings['theme']) : $this->defaultsettings['theme'];
-		wp_enqueue_style( 'syntaxhighlighter-theme-' . $theme );
+		if ( 'none' == $this->settings['theme'] )
+			wp_enqueue_style( 'syntaxhighlighter-core' );
+		else {
+			$theme = ( !empty($this->themes[$this->settings['theme']]) ) ? strtolower($this->settings['theme']) : $this->defaultsettings['theme'];
+			wp_enqueue_style( 'syntaxhighlighter-theme-' . $theme );
+		}
 	}
 
 
@@ -633,7 +638,7 @@ class SyntaxHighlighter {
 		<li><?php printf( __('%s &#8212; An interger specifying what number the first line should be (for the line numbering).', 'syntaxhighlighter'), '<code>firstline</code>' ); ?></li>
 		<li><?php printf( __('%s &#8212; Toggle the left-side line numbering.', 'syntaxhighlighter'), '<code>gutter</code>' ); ?></li>
 		<li><?php printf( __('%s &#8212; A comma-sperated list of line numbers to highlight.', 'syntaxhighlighter'), '<code>highlight</code>' ); ?></li>
-		<li><?php printf( __("%s &#8212; Toggle highlighting any extra HTML/XML. Good for when you're mixing HTML/XML with another language, such as having PHP inside an HTML web page.", 'syntaxhighlighter'), '<code>htmlscript</code>' ); ?></li>
+		<li><?php printf( __("%s &#8212; Toggle highlighting any extra HTML/XML. Good for when you're mixing HTML/XML with another language, such as having PHP inside an HTML web page. The above preview has it enabled for example.", 'syntaxhighlighter'), '<code>htmlscript</code>' ); ?></li>
 		<li><?php printf( __("%s &#8212; Toggle light mode which disables the gutter, toolbar, and ruler all at once.", 'syntaxhighlighter'), '<code>light</code>' ); ?></li>
 		<li><?php printf( __("%s &#8212; Toggle the column ruler at the top of the code box.", 'syntaxhighlighter'), '<code>ruler</code>' ); ?></li>
 		<li><?php printf( __("%s &#8212; Toggle the toolbar containing the helpful buttons.", 'syntaxhighlighter'), '<code>toolbar</code>' ); ?></li>
