@@ -291,6 +291,14 @@ class SyntaxHighlighter {
 
 		$atts = $this->attributefix( $atts );
 
+		// Re-map [code="php"] style tags
+		if ( isset($atts[0]) ) {
+			if ( empty($atts['language']) )
+				$atts['language'] = $atts[0];
+
+			unset($atts[0]);
+		}
+
 		$strings = array();
 		foreach ( $atts as $key => $value )
 			$strings[] = ( $quotes ) ? $key . '="' . attribute_escape( $value ) . '"' : $key . '=' . attribute_escape( $value );
