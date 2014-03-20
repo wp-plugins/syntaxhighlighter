@@ -55,6 +55,11 @@ Make sure your theme's `footer.php` file has `<?php wp_footer(); ?>` somewhere i
 
 == ChangeLog ==
 
+= Version 3.1.9 =
+
+* Reset box-shadow property for better theme support. Props Michael Fields.
+* Crush images for smaller filesizes.
+
 = Version 3.1.8 =
 
 * TinyMCE 4.x compatibility. Props azaozz.
