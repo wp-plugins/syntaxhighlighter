@@ -55,6 +55,11 @@ Make sure your theme's `footer.php` file has `<?php wp_footer(); ?>` somewhere i
 
 == ChangeLog ==
 
+= Version 3.1.13 =
+
+* Fix setting sanitization bug. Props Alexander Concha (@xknown).
+* Don't encode shortcode contents on (un)trash. Props Andrew Ozz (@azaozz).
+
 = Version 3.1.12 =
 
 * Updated editor JavaScript for WordPress 4.3. Props Andrew Ozz (@azaozz).
